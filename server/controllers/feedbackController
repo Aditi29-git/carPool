@@ -1,0 +1,94 @@
+const Ride = require('../models/rideModel');
+const User = require('../models/user');
+const Feedback = require('../models/feedback');
+const nodemailer = require('nodemailer');
+const { v4: uuidv4 } = require('uuid');
+require('dotenv').config();
+
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
+});
+
+// Store temporary feedback tokens (valid until submission)
+const feedbackTokens = new Map();
+
+/**
+ * Send feedback email to passengers when ride is completed.
+ */
+exports.sendFeedbackRequest = async (rideId) => {
+    try {
+        const ride = await Ride.findById(rideId).populate('passengers', 'email');
+
+        if (!ride) {
+            console.error("Ride not found");
+            return;
+        }
+
+        // Generate feedback URLs for each passenger
+        for (const passenger of ride.passengers) {
+            const token = uuidv4();
+            feedbackTokens.set(token, { rideId, passengerId: passenger._id });
+
+            const feedbackUrl = `http://localhost:5000/feedback/${token}`;
+
+            const mailOptions = {
+                from: process.env.EMAIL_USER,
+                to: passenger.email,
+                subject: 'Rate Your Ride',
+                html: `<p>Your ride from <strong>${ride.origin}</strong> to <strong>${ride.destination}</strong> has been completed.</p>
+                       <p>We'd love to hear your feedback!</p>
+                       <p><a href="${feedbackUrl}">Click here to rate your ride</a></p>`
+            };
+
+            await transporter.sendMail(mailOptions);
+        }
+
+        console.log("Feedback emails sent successfully.");
+    } catch (error) {
+        console.error("Error sending feedback emails:", error);
+    }
+};
+
+/**
+ * Submit feedback from passengers.
+ */
+exports.submitFeedback = async (req, res) => {
+    try {
+        const { token } = req.params;
+        const { rating, comment } = req.body;
+
+        // Validate token
+        if (!feedbackTokens.has(token)) {
+            return res.status(400).json({ message: "Invalid or expired feedback link." });
+        }
+
+        const { rideId, passengerId } = feedbackTokens.get(token);
+
+        // Validate rating
+        if (!rating || rating < 1 || rating > 5) {
+            return res.status(400).json({ message: "Rating must be between 1 and 5." });
+        }
+
+        // Save feedback
+        const feedback = new Feedback({
+            ride: rideId,
+            passenger: passengerId,
+            rating,
+            comment
+        });
+
+        await feedback.save();
+
+        // Remove token after submission
+        feedbackTokens.delete(token);
+
+        return res.status(201).json({ message: "Thank you for your feedback!" });
+    } catch (error) {
+        console.error("Error submitting feedback:", error);
+        return res.status(500).json({ message: "Error submitting feedback.", error: error.message });
+    }
+};
