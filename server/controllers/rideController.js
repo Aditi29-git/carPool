@@ -22,11 +22,11 @@ exports.createRide = async (req, res) => {
         }
 
         // Extract ride details from the request body
-        const { origin, destination, date, time, startingTime, expectedTime, availableSeats, pricePerSeat } = req.body;
+        const { origin, destination, date, startingTime, expectedTime, availableSeats, pricePerSeat } = req.body;
         const riderId = req.user._id;
 
         // Validate the required fields
-        if (!origin || !destination || !date || !time || !availableSeats || !pricePerSeat) {
+        if (!origin || !destination || !date || !availableSeats || !pricePerSeat) {
             return res.status(400).json({ message: "All fields are required" });
         }
 
@@ -57,7 +57,6 @@ exports.createRide = async (req, res) => {
             origin,
             destination,
             date,
-            time,
             startingTime,
             expectedTime,
             availableSeats,
@@ -87,16 +86,25 @@ exports.fetchAvailableRides = async (req, res) => {
             status: 'available',
         };
 
-        if (origin) query.origin = new RegExp(`^${origin}$`, 'i');
-        if (destination) query.destination = new RegExp(`^${destination}$`, 'i');
-        if (date) query.date = new Date(date);
+        if (origin) query.origin = new RegExp(origin, 'i');  // Remove exact match requirement
+        if (destination) query.destination = new RegExp(destination, 'i');  // Remove exact match requirement
+        if (date) {
+            // Create start and end of the selected date
+            const searchDate = new Date(date);
+            const startOfDay = new Date(searchDate.setHours(0, 0, 0, 0));
+            const endOfDay = new Date(searchDate.setHours(23, 59, 59, 999));
+            query.date = {
+                $gte: startOfDay,
+                $lte: endOfDay
+            };
+        }
         if (minSeats) query.availableSeats = { $gte: parseInt(minSeats, 10) };
 
         // Fetch rides based on the query
         const rides = await Ride.find(query)
             .populate('rider', 'name email phoneNumber')
             .populate('passengers', 'name email')
-            .sort({ date: 1, time: 1 }); // Sort by date and time
+            .sort({ date: 1, time: 1 });
 
         // If no rides are found, send a response
         if (!rides.length) {
@@ -110,8 +118,11 @@ exports.fetchAvailableRides = async (req, res) => {
     }
 };
 
+
+
 exports.bookRide = async (req, res) => {
     try {
+        console.log("booking started")
         const { rideId, seatsToBook } = req.body;
 
         // Validate 
@@ -361,6 +372,126 @@ exports.startRide = async (req, res) => {
     } catch (error) {
         console.error('Error in startRide:', error);
         res.status(500).json({ success: false, message: "Error starting ride", error: error.message });
+    }
+};
+
+exports.fetchMyBookings = async (req, res) => {
+    try {
+        // Find all rides where the current user is in the passengers array
+        const bookings = await Ride.find({
+            passengers: req.user._id
+        })
+        .populate('rider', 'name email phoneNumber')
+        .populate('passengers', 'name email phoneNumber')
+        .sort({ date: -1 }); // Sort by date, most recent first
+
+        // Map over the bookings to modify the status for the user's view
+        const modifiedBookings = bookings.map(booking => {
+            const bookingObj = booking.toObject();
+            // If the user is a passenger, show as 'booked' unless completed/cancelled
+            if (bookingObj.passengers.some(passenger => passenger._id.toString() === req.user._id.toString())) {
+                if (bookingObj.status === 'available') {
+                    bookingObj.status = 'booked';
+                }
+            }
+            return bookingObj;
+        });
+
+        if (!bookings.length) {
+            return res.status(404).json({ message: "No bookings found" });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Bookings fetched successfully",
+            bookings: modifiedBookings
+        });
+    } catch (error) {
+        console.error("Error fetching bookings:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error fetching bookings",
+            error: error.message
+        });
+    }
+};
+
+exports.cancelRide = async (req, res) => {
+    try {
+        const { rideId } = req.params;
+        const userId = req.user._id;
+
+        const ride = await Ride.findById(rideId);
+
+        if (!ride) {
+            return res.status(404).json({
+                success: false,
+                message: "Ride not found"
+            });
+        }
+
+        // Check if the user is either the rider or a passenger
+        const isRider = ride.rider.toString() === userId.toString();
+        const isPassenger = ride.passengers.some(passenger => passenger.toString() === userId.toString());
+
+        if (!isRider && !isPassenger) {
+            return res.status(403).json({
+                success: false,
+                message: "You are not authorized to cancel this ride"
+            });
+        }
+
+        // Cannot cancel if ride is already completed or cancelled
+        if (ride.status === 'completed') {
+            return res.status(400).json({
+                success: false,
+                message: "Cannot cancel a completed ride"
+            });
+        }
+
+        if (ride.status === 'cancelled') {
+            return res.status(400).json({
+                success: false,
+                message: "Ride is already cancelled"
+            });
+        }
+
+        // Update ride status
+        ride.status = 'cancelled';
+        await ride.save();
+
+        // Send email notifications to all affected users
+        const passengers = await User.find({ _id: { $in: ride.passengers } }, 'email');
+        const emails = passengers.map(passenger => passenger.email).filter(email => email);
+
+        if (emails.length) {
+            const mailOptions = {
+                from: process.env.EMAIL_USER,
+                to: emails,
+                subject: 'Ride Cancellation Notice',
+                html: `<p>Your ride from ${ride.origin} to ${ride.destination} has been cancelled.</p>`
+            };
+
+            try {
+                await transporter.sendMail(mailOptions);
+            } catch (emailError) {
+                console.error("Email sending error:", emailError);
+            }
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Ride cancelled successfully",
+            ride
+        });
+
+    } catch (error) {
+        console.error("Error cancelling ride:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error cancelling ride",
+            error: error.message
+        });
     }
 };
 

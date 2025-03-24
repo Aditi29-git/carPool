@@ -66,7 +66,7 @@ exports.sendOTP = async (req, res) => {
         };
 
         await transporter.sendMail(mailOptions);
-
+        console.log("OTP sent to email", email);
         return res.status(200).json({ message: "OTP sent to email", email });
     } catch (error) {
         console.error("Error sending OTP:", error);
@@ -139,14 +139,14 @@ exports.login = async (req, res) => {
         };
 
         const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-
+        console.log("token", token);
         res.cookie('token', token, {
-            httpOnly: false,
-            sameSite: 'None',
-            secure: process.env.NODE_ENV === 'production',
-            maxAge: 24 * 60 * 60 * 1000
+            httpOnly: true,
+            secure: true,
+            sameSite: 'none',
+            maxAge: 7*24 * 60 * 60 * 1000,
         });
-
+        
         res.status(200).json({ message: "Login successful", token, role: user.role });
     } catch (error) {
         console.error("Error logging in:", error);
@@ -222,5 +222,30 @@ exports.resetPassword = async (req, res) => {
         res.status(200).json({ message: 'Password reset successful' });
     } catch (error) {
         res.status(500).json({ message: 'Error resetting password' });
+    }
+};
+
+exports.checkAuth = async (req, res) => {
+    try {
+        const token = req.cookies.token;
+        if (!token) {
+            return res.status(401).json({ message: "No token found" });
+        }
+
+        const decoded = jwt.verify(token, JWT_SECRET);
+        const user = await User.findById(decoded._id).select('-password');
+        
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        return res.status(200).json({
+            message: "Authentication valid",
+            role: user.role,
+            token
+        });
+    } catch (error) {
+        console.error("Error checking auth:", error);
+        return res.status(401).json({ message: "Invalid token" });
     }
 };
