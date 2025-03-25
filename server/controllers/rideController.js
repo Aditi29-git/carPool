@@ -123,7 +123,7 @@ exports.fetchAvailableRides = async (req, res) => {
 exports.bookRide = async (req, res) => {
     try {
         console.log("booking started")
-        const { rideId, seatsToBook } = req.body;
+        const { rideId, seatsToBook, paymentId } = req.body;
 
         // Validate 
         if (!rideId || !seatsToBook) {
@@ -132,6 +132,11 @@ exports.bookRide = async (req, res) => {
 
         if (seatsToBook < 1) {
             return res.status(400).json({ message: "You must book at least one seat." });
+        }
+
+        // Verify payment before booking
+        if (!paymentId) {
+            return res.status(400).json({ message: "Payment is required to book a ride." });
         }
 
         // Fetch
