@@ -39,8 +39,13 @@ const rideSchema = new mongoose.Schema({
     ],
     status: {
         type: String,
-        enum: ['available', 'booked', 'completed', 'cancelled','started'],
+        enum: ['available', 'booked', 'completed', 'cancelled', 'started'],
         default: 'available',
+    },
+    paymentStatus: {
+        type: String,
+        enum: ['pending', 'completed'],
+        default: 'pending'
     },
     startingTime: {
         type: Date,
@@ -50,6 +55,36 @@ const rideSchema = new mongoose.Schema({
         type: Date,
         required: true,
     },
+    actualStartTime: {
+        type: Date
+    },
+    actualEndTime: {
+        type: Date
+    },
+    passengerPayments: [{
+        passenger: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        },
+        paymentStatus: {
+            type: String,
+            enum: ['pending', 'completed'],
+            default: 'pending'
+        },
+        paymentId: String,
+        paidAmount: Number,
+        paidAt: Date
+    }],
+    passengerBookings: [{
+        passenger: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        },
+        bookingTime: {
+            type: Date,
+            default: Date.now
+        }
+    }]
 }, {
     timestamps: true,
 });

@@ -19,6 +19,25 @@ const ManageRides = () => {
   }, [error, dispatch]);
 
   const handleStartRide = (rideId) => {
+    // Find the ride that's being started
+    const ride = myRides.find(r => r._id === rideId);
+    
+    // Check if the ride has any passengers
+    if (!ride.passengers || ride.passengers.length === 0) {
+      toast.error('Cannot start ride without any passengers');
+      return;
+    }
+
+    // Check if current time is before starting time
+    const currentTime = new Date();
+    const startTime = new Date(ride.startingTime);
+    
+    if (currentTime < startTime) {
+      const timeLeft = Math.ceil((startTime - currentTime) / (1000 * 60)); // Time left in minutes
+      toast.error(`Cannot start ride before scheduled time. Please wait ${timeLeft} minutes.`);
+      return;
+    }
+
     dispatch(startRide(rideId))
       .unwrap()
       .then(() => {
@@ -55,10 +74,25 @@ const ManageRides = () => {
     }
   };
 
-  const formatDateTime = (dateString, timeString) => {
-    const date = new Date(dateString);
-    console.log(timeString);
-    return `${date.toLocaleDateString()} ${timeString}`;
+  const getPaymentStatusColor = (status) => {
+    switch (status) {
+      case 'completed':
+        return 'bg-green-100 text-green-800';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const formatDateTime = (dateString) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleString();
+  };
+
+  const formatPaymentTime = (dateString) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleString();
   };
 
   if (isLoading) {
@@ -80,10 +114,22 @@ const ManageRides = () => {
                 <h3 className="text-lg font-semibold">{ride.origin} → {ride.destination}</h3>
                 <div className="mt-2 space-y-1">
                   <p className="text-sm text-gray-600">
-                    Start: {formatDateTime(ride.date, ride.time)}
+                    Scheduled Start: {formatDateTime(ride.startingTime)}
                   </p>
+                  {ride.actualStartTime && (
+                    <>
+                      <p className="text-sm text-gray-600">
+                        Actual Start: {formatDateTime(ride.actualStartTime)}
+                      </p>
+                      {ride.delayInMinutes > 0 && (
+                        <p className="text-sm text-yellow-600">
+                          Delayed by: {ride.delayInMinutes} minutes
+                        </p>
+                      )}
+                    </>
+                  )}
                   <p className="text-sm text-gray-600">
-                    Expected End: {new Date(ride.expectedTime).toLocaleString()}
+                    {ride.status === 'started' ? 'Updated Expected End' : 'Expected End'}: {formatDateTime(ride.expectedTime)}
                   </p>
                   <p className="text-sm text-gray-600">
                     Available Seats: {ride.availableSeats}
@@ -102,18 +148,59 @@ const ManageRides = () => {
 
             {ride.passengers && ride.passengers.length > 0 && (
               <div className="border-t pt-4 mb-4">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Passengers</h4>
-                <div className="space-y-2">
-                  {ride.passengers.map((passenger) => (
-                    <div key={passenger._id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                      <div>
-                        <p className="text-sm font-medium">{passenger.name}</p>
-                        <p className="text-xs text-gray-500">{passenger.email}</p>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Passengers & Payments</h4>
+                <div className="space-y-3">
+                  {ride.passengers.map((passenger) => {
+                    const paymentInfo = ride.passengerPayments?.find(
+                      payment => payment.passenger?.id === passenger._id
+                    );
+                    
+                    return (
+                      <div key={passenger._id} className="bg-gray-50 p-3 rounded-lg">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-sm font-medium">{passenger.name}</p>
+                            <p className="text-xs text-gray-500">{passenger.email}</p>
+                            <p className="text-xs text-gray-500">{passenger.phoneNumber}</p>
+                          </div>
+                          <div className="text-right">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              getPaymentStatusColor(paymentInfo?.paymentStatus || 'pending')
+                            }`}>
+                              {paymentInfo?.paymentStatus === 'completed' ? 'Paid' : 'Payment Pending'}
+                            </span>
+                            {paymentInfo?.paymentStatus === 'completed' && (
+                              <div className="mt-1">
+                                <p className="text-xs text-gray-500">
+                                  Paid: ₹{paymentInfo.paidAmount || ride.pricePerSeat}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {formatPaymentTime(paymentInfo.paidAt)}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  ID: {paymentInfo.paymentId}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-600">{passenger.phoneNumber}</p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
+                {ride.status === 'completed' && (
+                  <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Payment Summary</h4>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <p>Total Expected:</p>
+                      <p className="text-right">₹{ride.totalEarnings}</p>
+                      <p>Total Received:</p>
+                      <p className="text-right">₹{ride.receivedPayments}</p>
+                      <p>Pending Amount:</p>
+                      <p className="text-right">₹{ride.totalEarnings - ride.receivedPayments}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

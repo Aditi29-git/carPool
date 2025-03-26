@@ -1,3 +1,5 @@
+import { toast } from 'react-toastify';
+
 export const initializeRazorpay = () => {
     return new Promise((resolve) => {
         const script = document.createElement('script');
@@ -13,79 +15,56 @@ export const initializeRazorpay = () => {
 };
 
 export const makePayment = async (amount, rideId, user, onSuccess) => {
-    const res = await initializeRazorpay();
-
-    if (!res) {
-        alert('Razorpay SDK failed to load');
-        return;
-    }
-
     try {
-        const response = await fetch('/api/payments/create-order', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                amount,
-                rideId
-            }),
-            credentials: 'include'
-        });
-
-        const data = await response.json();
-
-        if (!data.success) {
-            throw new Error(data.message);
+        // Validate inputs
+        if (!amount || amount <= 0) {
+            throw new Error('Invalid amount');
         }
 
+        console.log('Payment initialization with:', { amount, rideId, user });
+
+        const res = await initializeRazorpay();
+        if (!res) {
+            throw new Error('Razorpay SDK failed to load');
+        }
+
+        // Configure Razorpay options
         const options = {
-            key: process.env.REACT_APP_RAZORPAY_KEY_ID,
-            amount: data.order.amount,
-            currency: data.order.currency,
-            name: "Ride Sharing",
-            description: "Ride Booking Payment",
-            order_id: data.order.id,
-            handler: async function (response) {
-                try {
-                    const verificationResponse = await fetch('/api/payments/verify-payment', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            razorpay_payment_id: response.razorpay_payment_id,
-                            razorpay_order_id: response.razorpay_order_id,
-                            razorpay_signature: response.razorpay_signature
-                        }),
-                        credentials: 'include'
-                    });
-
-                    const verificationData = await verificationResponse.json();
-
-                    if (verificationData.success) {
-                        onSuccess(response.razorpay_payment_id);
-                    }
-                } catch (error) {
-                    console.error('Payment verification failed:', error);
-                    alert('Payment verification failed');
-                }
+            key: "rzp_test_5XhKGpSXFOwnLs", // Test mode key
+            amount: Math.round(amount * 100), // Convert to paise
+            currency: "INR",
+            name: "RideShare",
+            description: "Ride Payment",
+            handler: function(response) {
+                console.log('Payment response:', response);
+                // Call the success callback with the payment ID
+                onSuccess(response.razorpay_payment_id);
             },
             prefill: {
-                name: user.name,
-                email: user.email,
-                contact: user.phoneNumber
+                name: user.name || "",
+                email: user.email || "",
+                contact: user.phoneNumber || ""
             },
             theme: {
-                color: "#3399cc"
+                color: "#4F46E5"
+            },
+            modal: {
+                ondismiss: function() {
+                    toast.info("Payment cancelled");
+                }
             }
         };
 
-        const paymentObject = new window.Razorpay(options);
-        paymentObject.open();
+        const razorpay = new window.Razorpay(options);
+        razorpay.on('payment.failed', function(response) {
+            console.error('Payment failed:', response.error);
+            toast.error(response.error.description || "Payment failed");
+        });
+        razorpay.open();
 
     } catch (error) {
-        console.error('Payment initialization failed:', error);
-        alert('Payment initialization failed');
+        console.error('Payment error:', error);
+        toast.error(error.message || "Error during payment initialization");
+        throw error;
     }
 }; 

@@ -40,9 +40,10 @@ const SearchRides = () => {
       });
   };
 
-  const formatDateTime = (dateString, timeString) => {
-    const date = new Date(dateString);
-    return `${date.toLocaleDateString()} ${timeString}`;
+  const formatDateTime = (dateString, startingTime) => {
+    if (!dateString || !startingTime) return 'Not specified';
+    const startDate = new Date(startingTime);
+    return startDate.toLocaleString();
   };
 
   return (
@@ -141,7 +142,7 @@ const SearchRides = () => {
                   <h3 className="text-lg font-semibold">{ride.origin} → {ride.destination}</h3>
                   <div className="mt-2 space-y-1">
                     <p className="text-sm text-gray-600">
-                      Start: {formatDateTime(ride.date, ride.time)}
+                      Start: {formatDateTime(ride.date, ride.startingTime)}
                     </p>
                     <p className="text-sm text-gray-600">
                       Expected End: {new Date(ride.expectedTime).toLocaleString()}

@@ -123,6 +123,26 @@ export const cancelRide = createAsyncThunk(
     }
 );
 
+export const updatePaymentStatus = createAsyncThunk(
+    'rides/updatePaymentStatus',
+    async ({ rideId, paymentDetails }, { rejectWithValue }) => {
+        try {
+            const response = await axios.post(
+                `${process.env.REACT_APP_API_URL}/rides/${rideId}/update-payment-status`,
+                paymentDetails,
+                { withCredentials: true }
+            );
+
+            if (response.data.success) {
+                return response.data;
+            }
+            return rejectWithValue(response.data.message);
+        } catch (error) {
+            return rejectWithValue(error.response?.data?.message || 'Failed to update payment status');
+        }
+    }
+);
+
 const initialState = {
   availableRides: [],
   myRides: [],
@@ -205,9 +225,9 @@ const rideSlice = createSlice({
       })
       .addCase(startRide.fulfilled, (state, action) => {
         state.isLoading = false;
-        const rideId = action.payload.rideDetails.rideId;
+        const updatedRide = action.payload.ride;
         state.myRides = state.myRides.map(ride =>
-          ride._id === rideId ? { ...ride, status: 'started' } : ride
+          ride._id === updatedRide._id ? { ...ride, status: 'started' } : ride
         );
       })
       .addCase(startRide.rejected, (state, action) => {
@@ -276,6 +296,29 @@ const rideSlice = createSlice({
       .addCase(cancelRide.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload?.message || 'Failed to cancel ride';
+      })
+
+      // Update Payment Status
+      .addCase(updatePaymentStatus.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(updatePaymentStatus.fulfilled, (state, action) => {
+        state.isLoading = false;
+        // Update the specific booking's payment status
+        const bookingIndex = state.myBookings.findIndex(
+          booking => booking._id === action.payload.ride._id
+        );
+        if (bookingIndex !== -1) {
+          state.myBookings[bookingIndex] = {
+            ...state.myBookings[bookingIndex],
+            displayStatus: 'Payment Completed',
+            paymentDetails: action.payload.ride.paymentDetails
+          };
+        }
+      })
+      .addCase(updatePaymentStatus.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
       });
   },
 });
