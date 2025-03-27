@@ -460,32 +460,16 @@ exports.startRide = async (req, res) => {
             });
         }
 
-        // Check if it's too early to start the ride
         const now = new Date();
         const scheduledStartTime = new Date(ride.startingTime);
-
-        if (now < scheduledStartTime) {
-            const timeUntilStart = Math.ceil((scheduledStartTime - now) / 60000);
-            return res.status(400).json({
-                success: false,
-                message: `Cannot start ride before scheduled time. Please wait ${timeUntilStart} minutes.`
-            });
-        }
-
-        // Calculate delay if any
-        const delay = now > scheduledStartTime ? now.getTime() - scheduledStartTime.getTime() : 0;
-        const delayInMinutes = Math.floor(delay / 60000);
+        
+        // Calculate the original duration
+        const originalDuration = new Date(ride.expectedTime) - scheduledStartTime;
 
         // Update ride status and times
         ride.status = 'started';
         ride.actualStartTime = now;
-
-        // If started late, adjust the expected end time
-        const originalExpectedTime = new Date(ride.expectedTime);
-        if (delay > 0) {
-            ride.expectedTime = new Date(originalExpectedTime.getTime() + delay);
-            ride.delayInMinutes = delayInMinutes;
-        }
+        ride.expectedTime = new Date(now.getTime() + originalDuration);
 
         await ride.save();
 
@@ -500,7 +484,6 @@ exports.startRide = async (req, res) => {
                     <p>Your ride from ${ride.origin} to ${ride.destination} has begun.</p>
                     <p>Scheduled Start Time: ${scheduledStartTime.toLocaleString()}</p>
                     <p>Actual Start Time: ${now.toLocaleString()}</p>
-                    ${delay > 0 ? `<p>Delay: ${delayInMinutes} minutes</p>` : ''}
                     <p>Updated Expected Arrival: ${new Date(ride.expectedTime).toLocaleString()}</p>
                     <p>Driver Details:</p>
                     <p>Name: ${req.user.name}</p>
@@ -526,7 +509,6 @@ exports.startRide = async (req, res) => {
             ride: {
                 ...ride.toObject(),
                 scheduledStartTime: scheduledStartTime,
-                delayInMinutes: delayInMinutes,
                 actualStartTime: now,
                 adjustedExpectedTime: ride.expectedTime
             }

@@ -298,19 +298,12 @@ const MyBookings = () => {
                     Scheduled Start: {formatDateTime(booking.startingTime)}
                   </p>
                   {booking.actualStartTime && (
-                    <>
-                      <p className="text-sm text-gray-600">
-                        Actual Start: {formatDateTime(booking.actualStartTime)}
-                      </p>
-                      {booking.delayInMinutes > 0 && (
-                        <p className="text-sm text-yellow-600">
-                          Delayed by: {booking.delayInMinutes} minutes
-                        </p>
-                      )}
-                    </>
+                    <p className="text-sm text-gray-600">
+                      Actual Start: {formatDateTime(booking.actualStartTime)}
+                    </p>
                   )}
                   <p className="text-sm text-gray-600">
-                    {booking.status === 'started' ? 'Updated Expected End' : 'Expected End'}: {formatDateTime(booking.expectedTime)}
+                    {booking.status === 'started' ? 'Expected End' : 'Scheduled End'}: {formatDateTime(booking.expectedTime)}
                   </p>
                   <p className="text-sm text-gray-600">
                     Price per Seat: ₹{booking.pricePerSeat}

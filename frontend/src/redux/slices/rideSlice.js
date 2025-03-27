@@ -207,6 +207,9 @@ const rideSlice = createSlice({
     },
     clearCurrentRide: (state) => {
       state.currentRide = null;
+    },
+    clearAvailableRides: (state) => {
+      state.availableRides = [];
     }
   },
   extraReducers: (builder) => {
@@ -401,5 +404,5 @@ const rideSlice = createSlice({
   },
 });
 
-export const { clearError, setSearchParams, clearCurrentRide } = rideSlice.actions;
+export const { clearError, setSearchParams, clearCurrentRide, clearAvailableRides } = rideSlice.actions;
 export default rideSlice.reducer; 

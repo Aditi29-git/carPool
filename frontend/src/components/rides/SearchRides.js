@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchAvailableRides, bookRide, clearError } from '../../redux/slices/rideSlice';
+import { fetchAvailableRides, bookRide, clearError, clearAvailableRides } from '../../redux/slices/rideSlice';
 import { toast } from 'react-toastify';
 
 const SearchRides = () => {
@@ -13,6 +13,11 @@ const SearchRides = () => {
     // time: '',
     seats: 1
   });
+
+  // Clear available rides when component mounts to prevent seeing previous user's search results
+  useEffect(() => {
+    dispatch(clearAvailableRides());
+  }, [dispatch]);
 
   useEffect(() => {
     if (error) {
