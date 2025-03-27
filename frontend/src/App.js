@@ -16,6 +16,7 @@ import { useDispatch } from 'react-redux';
 import { checkAuth } from './redux/slices/authSlice';
 import './utils/axiosConfig';  // Import axios configuration
 import 'react-toastify/dist/ReactToastify.css';
+import { Helmet } from 'react-helmet';
 
 function AppContent() {
   const dispatch = useDispatch();
@@ -26,6 +27,9 @@ function AppContent() {
 
   return (
     <div className="App">
+      <Helmet>
+        <title>BITS Car Services</title>
+      </Helmet>
       <Navbar />
       <ToastContainer />
       <Routes>
