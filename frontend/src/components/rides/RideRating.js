@@ -1,8 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import { toast } from 'react-toastify';
-
-const API_URL = 'http://localhost:5000/api';
 
 const RideRating = ({ rideId, onRatingSubmitted }) => {
     const [rating, setRating] = useState(0);
@@ -14,50 +11,32 @@ const RideRating = ({ rideId, onRatingSubmitted }) => {
         
         // If there's no feedback, submit the rating immediately
         if (!feedback) {
-            submitRating(selectedRating, '');
+            handleSubmitRating(selectedRating, '');
         }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        submitRating(rating, feedback);
+        handleSubmitRating(rating, feedback);
     };
 
-    const submitRating = async (ratingValue, feedbackText) => {
+    const handleSubmitRating = async (ratingValue, feedbackText) => {
         if (isSubmitting) return;
         setIsSubmitting(true);
 
         try {
-            const response = await axios.post(
-                `${API_URL}/rides/${rideId}/rate`,
-                { 
-                    rating: ratingValue, 
-                    feedback: feedbackText 
-                },
-                {
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    withCredentials: true
-                }
-            );
-
-            if (response.data.success) {
-                if (onRatingSubmitted) {
-                    await onRatingSubmitted({
-                        rideId,
-                        rating: ratingValue,
-                        feedback: feedbackText,
-                        averageRating: response.data.data.averageRating,
-                        totalRatings: response.data.data.totalRatings
-                    });
-                }
-                toast.success('Thank you for your feedback!');
-            } else {
-                toast.error(response.data.message || 'Error submitting rating');
-            }
+            // Call the callback provided by parent component
+            await onRatingSubmitted({
+                rideId,
+                rating: ratingValue,
+                feedback: feedbackText
+            });
+            
+            // Reset form only on success
+            setRating(0);
+            setFeedback('');
         } catch (error) {
-            toast.error(error.response?.data?.message || 'Error submitting rating');
+            // Error will be handled by the parent component
         } finally {
             setIsSubmitting(false);
         }

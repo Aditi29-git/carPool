@@ -849,6 +849,7 @@ exports.fetchMyRides = async (req, res) => {
         .populate('rider', 'name email phoneNumber')
         .populate('passengers', 'name email phoneNumber')
         .populate('passengerPayments.passenger', 'name email phoneNumber')
+        .populate('ratings.passenger', 'name email')
         .sort({ date: -1 }); // Sort by date, most recent first
 
         // Map over the rides to add display status and payment details
@@ -873,6 +874,11 @@ exports.fetchMyRides = async (req, res) => {
                         payment => payment.passenger?._id.toString() === passenger._id.toString()
                     );
                     
+                    // Find the passenger's rating if it exists
+                    const passengerRating = ride.ratings?.find(
+                        rating => rating.passenger?._id.toString() === passenger._id.toString()
+                    );
+
                     return {
                         passenger: {
                             id: passenger._id,
@@ -884,9 +890,20 @@ exports.fetchMyRides = async (req, res) => {
                         amount: rideObj.pricePerSeat,
                         paidAmount: paymentRecord?.paidAmount,
                         paidAt: paymentRecord?.paidAt,
-                        paymentId: paymentRecord?.paymentId
+                        paymentId: paymentRecord?.paymentId,
+                        rating: passengerRating ? {
+                            rating: passengerRating.rating,
+                            feedback: passengerRating.feedback,
+                            createdAt: passengerRating.createdAt
+                        } : null
                     };
                 });
+
+                // Calculate average rating and total ratings
+                if (ride.ratings && ride.ratings.length > 0) {
+                    rideObj.averageRating = ride.ratings.reduce((sum, r) => sum + r.rating, 0) / ride.ratings.length;
+                    rideObj.totalRatings = ride.ratings.length;
+                }
             } else {
                 rideObj.displayStatus = rideObj.status.charAt(0).toUpperCase() + rideObj.status.slice(1);
             }
@@ -970,43 +987,44 @@ exports.rateRide = async (req, res) => {
             });
         }
 
-        // Check if user has already rated
-        const existingRating = ride.ratings.find(r => r.passenger.toString() === userId.toString());
-        if (existingRating) {
+        // Check if the user has already submitted a rating
+        const existingRatingIndex = ride.ratings.findIndex(r => 
+            r.passenger.toString() === userId.toString()
+        );
+
+        if (existingRatingIndex !== -1) {
             return res.status(400).json({
                 success: false,
-                message: 'You have already rated this ride'
+                message: 'You have already submitted a rating for this ride'
             });
         }
 
-        // Add the rating
+        // Add rating
         ride.ratings.push({
             passenger: userId,
             rating,
-            feedback
+            feedback,
+            createdAt: new Date()
         });
-
-        // Calculate new average rating
-        const totalRating = ride.ratings.reduce((sum, r) => sum + r.rating, 0);
-        ride.averageRating = totalRating / ride.ratings.length;
 
         await ride.save();
 
-        res.status(200).json({
+        // Calculate average rating
+        const averageRating = ride.ratings.reduce((sum, r) => sum + r.rating, 0) / ride.ratings.length;
+
+        return res.status(200).json({
             success: true,
-            message: 'Ride rated successfully',
+            message: 'Rating submitted successfully',
             data: {
-                rideId,
-                averageRating: ride.averageRating,
+                averageRating,
                 totalRatings: ride.ratings.length
             }
         });
-
     } catch (error) {
-        console.error('Error rating ride:', error);
-        res.status(500).json({
+        console.error('Error submitting rating:', error);
+        return res.status(500).json({
             success: false,
-            message: 'Error rating ride',
+            message: 'Error submitting rating',
             error: error.message
         });
     }

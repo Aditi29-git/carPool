@@ -178,16 +178,24 @@ const MyBookings = () => {
 
   const handleRatingSubmitted = async (ratingData) => {
     try {
-      await dispatch(submitRating({
+      // Check if rating exists already
+      const booking = myBookings.find(b => b._id === ratingData.rideId);
+      if (booking && booking.userRating) {
+        toast.warning('You have already submitted a rating for this ride');
+        return;
+      }
+
+      const result = await dispatch(submitRating({
         rideId: ratingData.rideId,
         rating: ratingData.rating,
         feedback: ratingData.feedback
       })).unwrap();
       
-      // Refresh bookings after rating submission
-      dispatch(fetchMyBookings());
+      toast.success('Thank you for your feedback!');
+      
+      // No need to fetch bookings again as Redux will update the state
     } catch (error) {
-      toast.error(error.message || 'Failed to submit rating');
+      toast.error(error || 'Failed to submit rating');
     }
   };
 

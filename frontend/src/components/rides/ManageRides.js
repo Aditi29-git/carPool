@@ -164,26 +164,58 @@ const ManageRides = () => {
                             <p className="text-xs text-gray-500">{passenger.phoneNumber}</p>
                           </div>
                           <div className="text-right">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              getPaymentStatusColor(paymentInfo?.paymentStatus || 'pending')
-                            }`}>
-                              {paymentInfo?.paymentStatus === 'completed' ? 'Paid' : 'Payment Pending'}
+                            <span 
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                              ${getPaymentStatusColor(paymentInfo?.paymentStatus)}`}
+                            >
+                              {paymentInfo?.paymentStatus === 'completed' 
+                                ? 'Paid' 
+                                : 'Payment Pending'}
                             </span>
                             {paymentInfo?.paymentStatus === 'completed' && (
-                              <div className="mt-1">
-                                <p className="text-xs text-gray-500">
-                                  Paid: ₹{paymentInfo.paidAmount || ride.pricePerSeat}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {formatPaymentTime(paymentInfo.paidAt)}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  ID: {paymentInfo.paymentId}
-                                </p>
-                              </div>
+                              <p className="text-xs text-gray-500 mt-1">
+                                ₹{paymentInfo.paidAmount || ride.pricePerSeat}
+                              </p>
+                            )}
+                            {paymentInfo?.paidAt && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                {formatPaymentTime(paymentInfo.paidAt)}
+                              </p>
                             )}
                           </div>
                         </div>
+                        
+                        {/* Display passenger rating if exists */}
+                        {paymentInfo?.rating && (
+                          <div className="mt-3 pt-3 border-t border-gray-200">
+                            <div className="flex justify-between items-center">
+                              <p className="text-sm font-medium text-gray-700">Passenger Rating:</p>
+                              <div className="flex items-center">
+                                <div className="flex mr-2">
+                                  {[1, 2, 3, 4, 5].map((star) => (
+                                    <span
+                                      key={star}
+                                      className={`text-lg ${
+                                        star <= paymentInfo.rating.rating ? 'text-yellow-400' : 'text-gray-300'
+                                      }`}
+                                    >
+                                      ★
+                                    </span>
+                                  ))}
+                                </div>
+                                <span className="text-xs text-gray-500">
+                                  {new Date(paymentInfo.rating.createdAt).toLocaleDateString()}
+                                </span>
+                              </div>
+                            </div>
+                            {paymentInfo.rating.feedback && (
+                              <div className="mt-2">
+                                <p className="text-sm font-medium text-gray-700">Feedback:</p>
+                                <p className="text-sm text-gray-600 italic">"{paymentInfo.rating.feedback}"</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -199,6 +231,30 @@ const ManageRides = () => {
                       <p>Pending Amount:</p>
                       <p className="text-right">₹{ride.totalEarnings - ride.receivedPayments}</p>
                     </div>
+                    
+                    {/* Display overall rating if exists */}
+                    {ride.averageRating && (
+                      <div className="mt-4 pt-3 border-t border-gray-200">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Overall Ride Rating</h4>
+                        <div className="flex items-center">
+                          <div className="flex">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <span
+                                key={star}
+                                className={`text-xl ${
+                                  star <= Math.round(ride.averageRating) ? 'text-yellow-400' : 'text-gray-300'
+                                }`}
+                              >
+                                ★
+                              </span>
+                            ))}
+                          </div>
+                          <span className="text-sm text-gray-600 ml-2">
+                            {ride.averageRating.toFixed(1)} ({ride.totalRatings} {ride.totalRatings === 1 ? 'rating' : 'ratings'})
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
