@@ -123,9 +123,41 @@ exports.fetchAvailableRides = async (req, res) => {
             return res.status(404).json({ message: "No rides found matching your criteria." });
         }
 
+        // Get rider IDs to fetch their average ratings
+        const riderIds = [...new Set(rides.map(ride => ride.rider._id.toString()))];
+        
+        // Fetch all rides by these riders to calculate their average ratings
+        const riderRides = await Ride.find({
+            rider: { $in: riderIds },
+            status: 'completed',
+            'ratings.0': { $exists: true } // Only rides with at least one rating
+        });
+        
+        // Calculate average rating for each rider
+        const riderRatings = {};
+        riderIds.forEach(riderId => {
+            const riderCompletedRides = riderRides.filter(r => r.rider.toString() === riderId);
+            if (riderCompletedRides.length > 0) {
+                // Flatten all ratings from all rides
+                const allRatings = riderCompletedRides.flatMap(r => r.ratings.map(rating => rating.rating));
+                const avgRating = allRatings.length > 0 
+                    ? allRatings.reduce((sum, r) => sum + r, 0) / allRatings.length 
+                    : 0;
+                const totalRatings = allRatings.length;
+                
+                riderRatings[riderId] = { 
+                    averageRating: avgRating,
+                    totalRatings: totalRatings
+                };
+            } else {
+                riderRatings[riderId] = { averageRating: 0, totalRatings: 0 };
+            }
+        });
+
         // Format the rides data and add booking status for the current user
         const formattedRides = rides.map(ride => {
             const rideObj = ride.toObject();
+            const riderId = ride.rider._id.toString();
             
             // Find the user's booking details
             const userBooking = ride.passengerBookings.find(booking => 
@@ -134,7 +166,10 @@ exports.fetchAvailableRides = async (req, res) => {
             
             const userHasBooked = !!userBooking;
             const seatsBookedByUser = userBooking ? userBooking.seatsBooked || 0 : 0;
-            const isRider = ride.rider._id.toString() === userId.toString();
+            const isRider = riderId === userId.toString();
+
+            // Add rider rating information
+            const riderRating = riderRatings[riderId] || { averageRating: 0, totalRatings: 0 };
 
             return {
                 ...rideObj,
@@ -145,9 +180,14 @@ exports.fetchAvailableRides = async (req, res) => {
                 isRider,
                 totalAvailableSeats: ride.availableSeats,
                 totalSeats: ride.availableSeats + seatsBookedByUser,
-                status: ride.status
+                status: ride.status,
+                riderRating: riderRating.averageRating,
+                riderTotalRatings: riderRating.totalRatings
             };
         });
+
+        // Sort rides by rider rating (highest first)
+        formattedRides.sort((a, b) => b.riderRating - a.riderRating);
 
         return res.status(200).json({ 
             message: "Available rides fetched successfully.", 

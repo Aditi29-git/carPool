@@ -26,6 +26,9 @@ export const fetchAvailableRides = createAsyncThunk(
       const response = await axios.post(`${API_URL}/rides/fetch-rides`, searchParams, {
         withCredentials: true
       });
+      
+      // Note: Rides are now sorted by rider rating on the server side
+      // with highest rated riders appearing first in the results
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response.data);

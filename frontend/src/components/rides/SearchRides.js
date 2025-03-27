@@ -135,42 +135,66 @@ const SearchRides = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6">
-          {availableRides.map((ride) => (
-            <div key={ride._id} className="bg-white shadow-md rounded-lg p-6">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="text-lg font-semibold">{ride.origin} → {ride.destination}</h3>
-                  <div className="mt-2 space-y-1">
-                    <p className="text-sm text-gray-600">
-                      Start: {formatDateTime(ride.date, ride.startingTime)}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Expected End: {new Date(ride.expectedTime).toLocaleString()}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Available Seats: {ride.availableSeats}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Price per Seat: ₹{ride.pricePerSeat}
-                    </p>
+          {availableRides && availableRides.length > 0 ? (
+            availableRides.map((ride) => (
+              <div key={ride._id} className="bg-white shadow-md rounded-lg p-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-lg font-semibold">{ride.origin} → {ride.destination}</h3>
+                    <div className="mt-2 space-y-1">
+                      <p className="text-sm text-gray-600">
+                        Start: {formatDateTime(ride.date, ride.startingTime)}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Expected End: {new Date(ride.expectedTime).toLocaleString()}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Available Seats: {ride.availableSeats}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Price per Seat: ₹{ride.pricePerSeat}
+                      </p>
+                    </div>
+                    <div className="mt-4">
+                      <p className="text-sm font-medium text-gray-700">Driver Details:</p>
+                      <p className="text-sm text-gray-600">{ride.rider?.name}</p>
+                      <p className="text-sm text-gray-600">{ride.rider?.email}</p>
+                      <div className="mt-2 flex items-center">
+                        <div className="flex">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <span
+                              key={star}
+                              className={`text-lg ${
+                                star <= Math.round(ride.riderRating) ? 'text-yellow-400' : 'text-gray-300'
+                              }`}
+                            >
+                              ★
+                            </span>
+                          ))}
+                        </div>
+                        <span className="ml-2 text-sm text-gray-600">
+                          {ride.riderRating ? (
+                            <>
+                              {ride.riderRating.toFixed(1)} ({ride.riderTotalRatings} {ride.riderTotalRatings === 1 ? 'rating' : 'ratings'})
+                            </>
+                          ) : (
+                            'New driver'
+                          )}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="mt-4">
-                    <p className="text-sm font-medium text-gray-700">Driver Details:</p>
-                    <p className="text-sm text-gray-600">{ride.rider?.name}</p>
-                    <p className="text-sm text-gray-600">{ride.rider?.email}</p>
-                  </div>
+                  <button
+                    onClick={() => handleBookRide(ride._id)}
+                    disabled={isLoading || ride.availableSeats < searchParams.seats}
+                    className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    Book Ride
+                  </button>
                 </div>
-                <button
-                  onClick={() => handleBookRide(ride._id)}
-                  disabled={isLoading || ride.availableSeats < searchParams.seats}
-                  className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50"
-                >
-                  Book Ride
-                </button>
               </div>
-            </div>
-          ))}
-          {!isLoading && availableRides.length === 0 && (
+            ))
+          ) : (
             <div className="text-center py-8 bg-white shadow-md rounded-lg">
               <p className="text-gray-500">No rides available for your search criteria.</p>
             </div>
