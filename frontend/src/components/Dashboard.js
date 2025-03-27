@@ -33,22 +33,11 @@ const Dashboard = () => {
           >
             Create Ride
           </button>
-          <button
-            onClick={() => setActiveTab('search')}
-            className={`${
-              activeTab === 'search'
-                ? 'border-indigo-500 text-indigo-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-          >
-            Search Rides
-          </button>
         </nav>
       </div>
 
       {activeTab === 'manage' && <ManageRides />}
       {activeTab === 'create' && <CreateRide />}
-      {activeTab === 'search' && <SearchRides />}
     </div>
   );
 
