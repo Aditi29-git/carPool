@@ -324,11 +324,25 @@ const rideSlice = createSlice({
       })
       .addCase(cancelRide.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.myBookings = state.myBookings.map(booking =>
-          booking._id === action.payload.ride._id
-            ? { ...booking, status: 'cancelled' }
-            : booking
+        console.log('Cancel ride action payload:', action.payload);
+        
+        // Find the booking index
+        const bookingIndex = state.myBookings.findIndex(
+          booking => booking._id === action.payload.ride._id
         );
+        
+        // Update the booking if found
+        if (bookingIndex !== -1) {
+          state.myBookings[bookingIndex] = {
+            ...state.myBookings[bookingIndex],
+            ...action.payload.ride,
+            status: 'cancelled',
+            displayStatus: 'Cancelled'
+          };
+          console.log('Updated booking in state:', state.myBookings[bookingIndex]);
+        } else {
+          console.warn('Booking not found in state:', action.payload.ride._id);
+        }
       })
       .addCase(cancelRide.rejected, (state, action) => {
         state.isLoading = false;

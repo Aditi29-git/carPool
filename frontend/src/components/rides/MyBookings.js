@@ -85,18 +85,41 @@ const MyBookings = () => {
 
   const getFilteredBookings = () => {
     const now = new Date();
+    let filteredBookings;
+    
     switch (filter) {
       case 'upcoming':
-        return bookings.filter(booking => new Date(booking.startingTime) > now && booking.status !== 'completed' && booking.status !== 'cancelled');
+        filteredBookings = bookings.filter(booking => 
+          new Date(booking.startingTime) > now && 
+          booking.status !== 'completed' && 
+          booking.status !== 'cancelled' &&
+          booking.displayStatus !== 'Cancelled'
+        );
+        break;
       case 'completed':
-        return bookings.filter(booking => booking.status === 'completed');
+        filteredBookings = bookings.filter(booking => 
+          booking.status === 'completed'
+        );
+        break;
       case 'cancelled':
-        return bookings.filter(booking => booking.status === 'cancelled');
+        // Look for cancelled status in either field
+        filteredBookings = bookings.filter(booking => 
+          booking.status === 'cancelled' || 
+          booking.displayStatus === 'Cancelled'
+        );
+        break;
       case 'pending-feedback':
-        return bookings.filter(booking => booking.status === 'completed' && canRate(booking));
+        filteredBookings = bookings.filter(booking => 
+          booking.status === 'completed' && 
+          canRate(booking)
+        );
+        break;
       default:
-        return bookings;
+        // 'all' case or any other filter - show all bookings
+        filteredBookings = bookings;
     }
+    
+    return filteredBookings;
   };
 
   const getStatusColor = (status) => {
@@ -114,13 +137,23 @@ const MyBookings = () => {
 
   const handleCancelRide = (rideId) => {
     dispatch(cancelRide(rideId))
-        .unwrap()
-        .then(() => {
-            toast.success('Ride cancelled successfully');
-        })
-        .catch((error) => {
-            toast.error(error.message);
+      .unwrap()
+      .then((response) => {
+        toast.success('Ride cancelled successfully');
+        
+        // Update cancellable bookings set
+        setCancellableBookings(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(rideId);
+          return newSet;
         });
+        
+        // Set filter to 'cancelled' to show the cancelled ride immediately
+        setFilter('cancelled');
+      })
+      .catch((error) => {
+        toast.error(error.message || 'Failed to cancel ride');
+      });
   };
 
   const formatDateTime = (dateString) => {
@@ -231,6 +264,8 @@ const MyBookings = () => {
     );
   }
 
+  const filteredBookings = getFilteredBookings();
+  
   return (
     <div className="max-w-6xl mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
@@ -253,7 +288,7 @@ const MyBookings = () => {
       </div>
 
       <div className="grid grid-cols-1 gap-6">
-        {getFilteredBookings().map((booking) => (
+        {filteredBookings.map((booking) => (
           <div key={booking._id} className="bg-white shadow-md rounded-lg p-6">
             <div className="flex justify-between items-start mb-4">
               <div>
@@ -414,13 +449,24 @@ const MyBookings = () => {
             )}
           </div>
         ))}
-        {bookings.length === 0 && (
+        {filteredBookings.length === 0 && (
           <div className="text-center py-8 bg-white shadow-md rounded-lg">
             <p className="text-gray-500">
               {filter === 'pending-feedback' 
                 ? "No rides pending feedback."
-                : "You haven't booked any rides yet."}
+                : filter === 'cancelled'
+                ? "No cancelled rides found."
+                : filter === 'completed'
+                ? "No completed rides found."
+                : filter === 'upcoming'
+                ? "No upcoming rides found."
+                : "No bookings found."}
             </p>
+            {filter === 'cancelled' && bookings.length > 0 && (
+              <p className="mt-2 text-sm text-gray-500">
+                Try refreshing the page if you've just cancelled a ride.
+              </p>
+            )}
           </div>
         )}
       </div>

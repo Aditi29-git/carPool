@@ -568,6 +568,9 @@ exports.fetchMyBookings = async (req, res) => {
                 booking => booking.passenger.toString() === req.user._id.toString()
             );
 
+            // Check if this user's booking is cancelled
+            const isCancelled = userBooking?.status === 'cancelled';
+
             // Find the user's rating if it exists
             const userRating = booking.ratings?.find(
                 rating => rating.passenger?._id.toString() === req.user._id.toString()
@@ -590,12 +593,17 @@ exports.fetchMyBookings = async (req, res) => {
             const bookingTime = userBooking ? new Date(userBooking.bookingTime) : null;
             const currentTime = new Date();
             const timeDifferenceInMinutes = bookingTime ? (currentTime - bookingTime) / (1000 * 60) : null;
-            const canCancel = bookingTime && timeDifferenceInMinutes <= 3 && bookingObj.status !== 'completed' && bookingObj.status !== 'cancelled';
+            const canCancel = bookingTime && timeDifferenceInMinutes <= 3 && bookingObj.status !== 'completed' && bookingObj.status !== 'cancelled' && !isCancelled;
 
             // If the user is a passenger, show appropriate status
             if (bookingObj.passengers.some(passenger => passenger._id.toString() === req.user._id.toString())) {
+                // If this passenger's booking is cancelled, show cancelled status
+                if (isCancelled) {
+                    bookingObj.status = 'cancelled';
+                    bookingObj.displayStatus = 'Cancelled';
+                }
                 // For completed rides, show payment status for this specific user
-                if (bookingObj.status === 'completed') {
+                else if (bookingObj.status === 'completed') {
                     bookingObj.displayStatus = userPayment?.paymentStatus === 'completed' ? 'Payment Completed' : 'Payment Pending';
                     bookingObj.paymentDetails = {
                         amount: bookingObj.pricePerSeat,
@@ -726,17 +734,25 @@ exports.cancelRide = async (req, res) => {
             // If rider cancels, cancel the entire ride
             ride.status = 'cancelled';
         } else {
-            // If passenger cancels, just remove them from the ride
-            ride.passengers = ride.passengers.filter(
-                passenger => passenger.toString() !== userId.toString()
+            // Instead of removing the passenger, just mark their booking as cancelled
+            const passengerBookingIndex = ride.passengerBookings.findIndex(
+                booking => booking.passenger.toString() === userId.toString()
             );
-            ride.passengerBookings = ride.passengerBookings.filter(
-                booking => booking.passenger.toString() !== userId.toString()
-            );
+            
+            if (passengerBookingIndex !== -1) {
+                ride.passengerBookings[passengerBookingIndex].status = 'cancelled';
+            }
+            
+            // Increase available seats
             ride.availableSeats += 1;
         }
 
         await ride.save();
+
+        // Create a response object that explicitly includes the cancelled status
+        const responseRide = ride.toObject();
+        responseRide.status = 'cancelled';
+        responseRide.displayStatus = 'Cancelled';
 
         // Send email notifications to all affected users
         const passengers = await User.find({ _id: { $in: ride.passengers } }, 'email');
@@ -760,7 +776,7 @@ exports.cancelRide = async (req, res) => {
         return res.status(200).json({
             success: true,
             message: "Ride cancelled successfully",
-            ride
+            ride: responseRide
         });
 
     } catch (error) {
