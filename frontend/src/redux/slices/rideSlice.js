@@ -143,6 +143,40 @@ export const updatePaymentStatus = createAsyncThunk(
     }
 );
 
+// Submit rating for a ride
+export const submitRating = createAsyncThunk(
+  'rides/submitRating',
+  async ({ rideId, rating, feedback }, { rejectWithValue }) => {
+    try {
+      const response = await axios.post(
+        `${API_URL}/rides/${rideId}/rate`,
+        { rating, feedback },
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          withCredentials: true
+        }
+      );
+
+      if (!response.data.success) {
+        return rejectWithValue(response.data.message);
+      }
+
+      return {
+        rideId,
+        rating,
+        feedback,
+        averageRating: response.data.data.averageRating,
+        totalRatings: response.data.data.totalRatings,
+        ratingSubmittedAt: new Date().toISOString()
+      };
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to submit rating');
+    }
+  }
+);
+
 const initialState = {
   availableRides: [],
   myRides: [],
@@ -319,6 +353,33 @@ const rideSlice = createSlice({
       .addCase(updatePaymentStatus.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload;
+      })
+
+      // Submit Rating
+      .addCase(submitRating.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(submitRating.fulfilled, (state, action) => {
+        state.isLoading = false;
+        // Update the specific booking's rating
+        const bookingIndex = state.myBookings.findIndex(
+          booking => booking._id === action.payload.rideId
+        );
+        if (bookingIndex !== -1) {
+          state.myBookings[bookingIndex] = {
+            ...state.myBookings[bookingIndex],
+            userRating: action.payload.rating,
+            userFeedback: action.payload.feedback,
+            ratingSubmittedAt: action.payload.ratingSubmittedAt,
+            averageRating: action.payload.averageRating,
+            totalRatings: action.payload.totalRatings
+          };
+        }
+      })
+      .addCase(submitRating.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload || 'Failed to submit rating';
       });
   },
 });

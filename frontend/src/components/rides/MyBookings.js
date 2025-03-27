@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchMyBookings, clearError, cancelRide } from '../../redux/slices/rideSlice';
+import { fetchMyBookings, clearError, cancelRide, submitRating } from '../../redux/slices/rideSlice';
 import { toast } from 'react-toastify';
 import RidePayment from './RidePayment';
+import RatingFeedback from './RatingFeedback';
+import RideRating from './RideRating';
 
 const CancelTimer = ({ bookingTime, onTimeExpired }) => {
     const [timeLeft, setTimeLeft] = useState(0);
@@ -47,12 +49,16 @@ const CancelTimer = ({ bookingTime, onTimeExpired }) => {
 const MyBookings = () => {
   const dispatch = useDispatch();
   const { myBookings, isLoading, error } = useSelector((state) => state.rides);
-  const [filter, setFilter] = useState('all'); // all, upcoming, completed, cancelled
+  const { user: currentUser } = useSelector((state) => state.auth);
+  const [filter, setFilter] = useState('all');
+  const [bookings, setBookings] = useState([]);
 
   // Add state to track which bookings can still be cancelled
   const [cancellableBookings, setCancellableBookings] = useState(new Set());
 
   useEffect(() => {
+    // Debug log for currentUser
+    console.log('Current user state:', currentUser);
     dispatch(fetchMyBookings());
   }, [dispatch]);
 
@@ -63,27 +69,33 @@ const MyBookings = () => {
     }
   }, [error, dispatch]);
 
-  // Initialize cancellableBookings when myBookings changes
+  useEffect(() => {
+    setBookings(myBookings);
+  }, [myBookings]);
+
+  // Initialize cancellableBookings when bookings changes
   useEffect(() => {
     const newCancellableBookings = new Set(
-        myBookings
+        bookings
             .filter(booking => canCancelRide(booking))
             .map(booking => booking._id)
     );
     setCancellableBookings(newCancellableBookings);
-  }, [myBookings]);
+  }, [bookings]);
 
   const getFilteredBookings = () => {
     const now = new Date();
     switch (filter) {
       case 'upcoming':
-        return myBookings.filter(booking => new Date(booking.startingTime) > now);
+        return bookings.filter(booking => new Date(booking.startingTime) > now && booking.status !== 'completed' && booking.status !== 'cancelled');
       case 'completed':
-        return myBookings.filter(booking => booking.status === 'completed');
+        return bookings.filter(booking => booking.status === 'completed');
       case 'cancelled':
-        return myBookings.filter(booking => booking.status === 'cancelled');
+        return bookings.filter(booking => booking.status === 'cancelled');
+      case 'pending-feedback':
+        return bookings.filter(booking => booking.status === 'completed' && canRate(booking));
       default:
-        return myBookings;
+        return bookings;
     }
   };
 
@@ -164,6 +176,45 @@ const MyBookings = () => {
     });
   };
 
+  const handleRatingSubmitted = async (ratingData) => {
+    try {
+      await dispatch(submitRating({
+        rideId: ratingData.rideId,
+        rating: ratingData.rating,
+        feedback: ratingData.feedback
+      })).unwrap();
+      
+      // Refresh bookings after rating submission
+      dispatch(fetchMyBookings());
+    } catch (error) {
+      toast.error(error.message || 'Failed to submit rating');
+    }
+  };
+
+  const canRate = (booking) => {
+    if (!currentUser?._id || !booking || !booking.passengers) {
+      return false;
+    }
+
+    // Check if the ride is completed
+    if (booking.status !== 'completed') {
+      return false;
+    }
+    
+    // Check if the current user is a passenger in this ride
+    const isPassenger = booking.passengers.some(passenger => {
+      const passengerId = passenger._id || passenger;
+      return passengerId.toString() === currentUser._id.toString();
+    });
+
+    if (!isPassenger) {
+      return false;
+    }
+    
+    // Check if the user has already rated
+    return !booking.userRating;
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -177,7 +228,7 @@ const MyBookings = () => {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">My Bookings</h2>
         <div className="flex space-x-2">
-          {['all', 'upcoming', 'completed', 'cancelled'].map((filterOption) => (
+          {['all', 'upcoming', 'completed', 'cancelled', 'pending-feedback'].map((filterOption) => (
             <button
               key={filterOption}
               onClick={() => setFilter(filterOption)}
@@ -187,7 +238,7 @@ const MyBookings = () => {
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              {filterOption.charAt(0).toUpperCase() + filterOption.slice(1)}
+              {filterOption === 'pending-feedback' ? 'Need Feedback' : filterOption.charAt(0).toUpperCase() + filterOption.slice(1)}
             </button>
           ))}
         </div>
@@ -281,11 +332,87 @@ const MyBookings = () => {
                 </div>
               </div>
             )}
+
+            {/* Rating and Feedback Section - Show for completed rides */}
+            {booking.status === 'completed' && (
+              <div className="mt-6 border-t pt-4">
+                {booking.userRating ? (
+                  // Show submitted rating and feedback
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-lg font-medium mb-2">Your Rating</h4>
+                      <div className="flex items-center gap-2">
+                        <div className="flex">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <span
+                              key={star}
+                              className={`text-2xl ${
+                                star <= booking.userRating ? 'text-yellow-400' : 'text-gray-300'
+                              }`}
+                            >
+                              ★
+                            </span>
+                          ))}
+                        </div>
+                        <span className="text-sm text-gray-600">
+                          Submitted on {new Date(booking.ratingSubmittedAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                    {booking.userFeedback && (
+                      <div>
+                        <h4 className="text-lg font-medium mb-2">Your Feedback</h4>
+                        <p className="text-gray-600 bg-gray-50 p-3 rounded-lg">
+                          {booking.userFeedback}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // Show rating form for completed rides without rating
+                  <div>
+                    <h4 className="text-lg font-medium mb-4">Rate this ride</h4>
+                    <RideRating
+                      rideId={booking._id}
+                      onRatingSubmitted={handleRatingSubmitted}
+                    />
+                  </div>
+                )}
+
+                {/* Show overall rating if exists */}
+                {booking.averageRating && (
+                  <div className="mt-6 pt-4 border-t">
+                    <h4 className="text-lg font-medium mb-2">Overall Rating</h4>
+                    <div className="flex items-center gap-2">
+                      <div className="flex">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <span
+                            key={star}
+                            className={`text-2xl ${
+                              star <= booking.averageRating ? 'text-yellow-400' : 'text-gray-300'
+                            }`}
+                          >
+                            ★
+                          </span>
+                        ))}
+                      </div>
+                      <span className="text-sm text-gray-600">
+                        ({booking.totalRatings} {booking.totalRatings === 1 ? 'rating' : 'ratings'})
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ))}
-        {myBookings.length === 0 && (
+        {bookings.length === 0 && (
           <div className="text-center py-8 bg-white shadow-md rounded-lg">
-            <p className="text-gray-500">You haven't booked any rides yet.</p>
+            <p className="text-gray-500">
+              {filter === 'pending-feedback' 
+                ? "No rides pending feedback."
+                : "You haven't booked any rides yet."}
+            </p>
           </div>
         )}
       </div>

@@ -511,6 +511,7 @@ exports.fetchMyBookings = async (req, res) => {
         .populate('rider', 'name email phoneNumber')
         .populate('passengers', 'name email phoneNumber')
         .populate('passengerPayments.passenger', 'name email phoneNumber')
+        .populate('ratings.passenger', 'name')
         .sort({ date: -1 }); // Sort by date, most recent first
 
         // Map over the bookings to modify the status for the user's view
@@ -526,6 +527,24 @@ exports.fetchMyBookings = async (req, res) => {
             const userBooking = booking.passengerBookings.find(
                 booking => booking.passenger.toString() === req.user._id.toString()
             );
+
+            // Find the user's rating if it exists
+            const userRating = booking.ratings?.find(
+                rating => rating.passenger?._id.toString() === req.user._id.toString()
+            );
+
+            // Add user's rating and feedback to the booking object
+            if (userRating) {
+                bookingObj.userRating = userRating.rating;
+                bookingObj.userFeedback = userRating.feedback;
+                bookingObj.ratingSubmittedAt = userRating.createdAt;
+            }
+
+            // Calculate average rating and total ratings
+            if (booking.ratings && booking.ratings.length > 0) {
+                bookingObj.averageRating = booking.ratings.reduce((sum, r) => sum + r.rating, 0) / booking.ratings.length;
+                bookingObj.totalRatings = booking.ratings.length;
+            }
 
             // Calculate if the booking is within the cancellation window (3 minutes)
             const bookingTime = userBooking ? new Date(userBooking.bookingTime) : null;
@@ -902,6 +921,92 @@ exports.fetchMyRides = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Error fetching rides",
+            error: error.message
+        });
+    }
+};
+
+// Rate a ride
+exports.rateRide = async (req, res) => {
+    try {
+        const { rating, feedback } = req.body;
+        const { rideId } = req.params;
+        const userId = req.user._id;
+
+        // Validate rating
+        if (!rating || rating < 1 || rating > 5) {
+            return res.status(400).json({
+                success: false,
+                message: 'Rating must be between 1 and 5'
+            });
+        }
+
+        // Find the ride
+        const ride = await Ride.findById(rideId);
+        if (!ride) {
+            return res.status(404).json({
+                success: false,
+                message: 'Ride not found'
+            });
+        }
+
+        // Check if the ride is completed
+        if (ride.status !== 'completed') {
+            return res.status(400).json({
+                success: false,
+                message: 'Can only rate completed rides'
+            });
+        }
+
+        // Check if user was a passenger
+        const isPassenger = ride.passengers.some(passengerId => 
+            passengerId.toString() === userId.toString()
+        );
+        
+        if (!isPassenger) {
+            return res.status(403).json({
+                success: false,
+                message: 'Only passengers can rate the ride'
+            });
+        }
+
+        // Check if user has already rated
+        const existingRating = ride.ratings.find(r => r.passenger.toString() === userId.toString());
+        if (existingRating) {
+            return res.status(400).json({
+                success: false,
+                message: 'You have already rated this ride'
+            });
+        }
+
+        // Add the rating
+        ride.ratings.push({
+            passenger: userId,
+            rating,
+            feedback
+        });
+
+        // Calculate new average rating
+        const totalRating = ride.ratings.reduce((sum, r) => sum + r.rating, 0);
+        ride.averageRating = totalRating / ride.ratings.length;
+
+        await ride.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Ride rated successfully',
+            data: {
+                rideId,
+                averageRating: ride.averageRating,
+                totalRatings: ride.ratings.length
+            }
+        });
+
+    } catch (error) {
+        console.error('Error rating ride:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error rating ride',
             error: error.message
         });
     }
