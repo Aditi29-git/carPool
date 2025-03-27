@@ -108,12 +108,6 @@ const MyBookings = () => {
           booking.displayStatus === 'Cancelled'
         );
         break;
-      case 'pending-feedback':
-        filteredBookings = bookings.filter(booking => 
-          booking.status === 'completed' && 
-          canRate(booking)
-        );
-        break;
       default:
         // 'all' case or any other filter - show all bookings
         filteredBookings = bookings;
@@ -271,7 +265,7 @@ const MyBookings = () => {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">My Bookings</h2>
         <div className="flex space-x-2">
-          {['all', 'upcoming', 'completed', 'cancelled', 'pending-feedback'].map((filterOption) => (
+          {['all', 'upcoming', 'completed', 'cancelled'].map((filterOption) => (
             <button
               key={filterOption}
               onClick={() => setFilter(filterOption)}
@@ -281,7 +275,7 @@ const MyBookings = () => {
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              {filterOption === 'pending-feedback' ? 'Need Feedback' : filterOption.charAt(0).toUpperCase() + filterOption.slice(1)}
+              {filterOption.charAt(0).toUpperCase() + filterOption.slice(1)}
             </button>
           ))}
         </div>
@@ -294,17 +288,42 @@ const MyBookings = () => {
               <div>
                 <h3 className="text-lg font-semibold">{booking.origin} → {booking.destination}</h3>
                 <div className="mt-2 space-y-1">
-                  <p className="text-sm text-gray-600">
-                    Scheduled Start: {formatDateTime(booking.startingTime)}
-                  </p>
-                  {booking.actualStartTime && (
-                    <p className="text-sm text-gray-600">
-                      Actual Start: {formatDateTime(booking.actualStartTime)}
-                    </p>
+                  {booking.status === 'started' ? (
+                    <>
+                      <p className="text-sm text-gray-600">
+                        Original Schedule: {formatDateTime(booking.startingTime)}
+                      </p>
+                      <p className="text-sm text-gray-600 font-medium text-blue-600">
+                        Started At: {formatDateTime(booking.actualStartTime)}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        New Expected Arrival: {formatDateTime(booking.expectedTime)}
+                      </p>
+                    </>
+                  ) : booking.status === 'completed' ? (
+                    <>
+                      <p className="text-sm text-gray-600">
+                        Original Schedule: {formatDateTime(booking.startingTime)}
+                      </p>
+                      {booking.actualStartTime && (
+                        <p className="text-sm text-gray-600">
+                          Started At: {formatDateTime(booking.actualStartTime)}
+                        </p>
+                      )}
+                      <p className="text-sm text-gray-600">
+                        Completed At: {formatDateTime(booking.actualEndTime)}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-gray-600">
+                        Scheduled Start: {formatDateTime(booking.startingTime)}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Expected End: {formatDateTime(booking.expectedTime)}
+                      </p>
+                    </>
                   )}
-                  <p className="text-sm text-gray-600">
-                    {booking.status === 'started' ? 'Expected End' : 'Scheduled End'}: {formatDateTime(booking.expectedTime)}
-                  </p>
                   <p className="text-sm text-gray-600">
                     Price per Seat: ₹{booking.pricePerSeat}
                   </p>
@@ -445,9 +464,7 @@ const MyBookings = () => {
         {filteredBookings.length === 0 && (
           <div className="text-center py-8 bg-white shadow-md rounded-lg">
             <p className="text-gray-500">
-              {filter === 'pending-feedback' 
-                ? "No rides pending feedback."
-                : filter === 'cancelled'
+              {filter === 'cancelled'
                 ? "No cancelled rides found."
                 : filter === 'completed'
                 ? "No completed rides found."

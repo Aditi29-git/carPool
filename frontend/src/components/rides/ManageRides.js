@@ -28,16 +28,6 @@ const ManageRides = () => {
       return;
     }
 
-    // Check if current time is before starting time
-    const currentTime = new Date();
-    const startTime = new Date(ride.startingTime);
-    
-    if (currentTime < startTime) {
-      const timeLeft = Math.ceil((startTime - currentTime) / (1000 * 60)); // Time left in minutes
-      toast.error(`Cannot start ride before scheduled time. Please wait ${timeLeft} minutes.`);
-      return;
-    }
-
     dispatch(startRide(rideId))
       .unwrap()
       .then(() => {

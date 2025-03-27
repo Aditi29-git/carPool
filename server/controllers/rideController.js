@@ -482,9 +482,9 @@ exports.startRide = async (req, res) => {
                 html: `
                     <h2>Your ride has started</h2>
                     <p>Your ride from ${ride.origin} to ${ride.destination} has begun.</p>
-                    <p>Scheduled Start Time: ${scheduledStartTime.toLocaleString()}</p>
+                    <p>Original Scheduled Time: ${scheduledStartTime.toLocaleString()}</p>
                     <p>Actual Start Time: ${now.toLocaleString()}</p>
-                    <p>Updated Expected Arrival: ${new Date(ride.expectedTime).toLocaleString()}</p>
+                    <p>New Expected Arrival: ${new Date(ride.expectedTime).toLocaleString()}</p>
                     <p>Driver Details:</p>
                     <p>Name: ${req.user.name}</p>
                     <p>Phone: ${req.user.phoneNumber}</p>
