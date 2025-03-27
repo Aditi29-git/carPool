@@ -27,7 +27,7 @@ const Navbar = () => {
           <div className="flex items-center">
             {isAuthenticated ? (
               <>
-                <span className="text-white mr-4">Welcome, {user?.role}</span>
+                <span className="text-white mr-4">Welcome, {user?.name || 'User'}</span>
                 <button
                   onClick={handleLogout}
                   className="bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-800"

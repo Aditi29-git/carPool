@@ -14,6 +14,7 @@ import Navbar from './components/Navbar';
 import { ToastContainer } from 'react-toastify';
 import { useDispatch } from 'react-redux';
 import { checkAuth } from './redux/slices/authSlice';
+import './utils/axiosConfig';  // Import axios configuration
 import 'react-toastify/dist/ReactToastify.css';
 
 function AppContent() {

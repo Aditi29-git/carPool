@@ -91,8 +91,8 @@ export const logout = createAsyncThunk(
 
 const initialState = {
   user: null,
-  token: null,
-  isAuthenticated: false,
+  token: localStorage.getItem('token'),
+  isAuthenticated: !!localStorage.getItem('token'),
   isLoading: false,
   error: null,
   registrationEmail: null,
@@ -108,6 +108,7 @@ const authSlice = createSlice({
       state.error = null;
     },
     resetAuth: (state) => {
+      localStorage.removeItem('token');
       return initialState;
     },
   },
@@ -116,11 +117,13 @@ const authSlice = createSlice({
       // Check Auth
       .addCase(checkAuth.fulfilled, (state, action) => {
         state.isAuthenticated = true;
-        state.user = { role: action.payload.role };
+        state.user = action.payload.user;
         state.token = action.payload.token;
+        localStorage.setItem('token', action.payload.token);
       })
       .addCase(checkAuth.rejected, (state) => {
-        return initialState;
+        localStorage.removeItem('token');
+        return { ...initialState, token: null, isAuthenticated: false };
       })
       // Register
       .addCase(register.pending, (state) => {
@@ -159,15 +162,22 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.isAuthenticated = true;
         state.token = action.payload.token;
-        state.user = { role: action.payload.role };
+        state.user = action.payload.user;
+        localStorage.setItem('token', action.payload.token);
       })
       .addCase(login.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload?.message || 'Login failed';
+        localStorage.removeItem('token');
       })
       // Logout
       .addCase(logout.fulfilled, (state) => {
-        return initialState;
+        localStorage.removeItem('token');
+        return { ...initialState, token: null, isAuthenticated: false };
+      })
+      .addCase(logout.rejected, (state) => {
+        localStorage.removeItem('token');
+        return { ...initialState, token: null, isAuthenticated: false };
       });
   },
 });
