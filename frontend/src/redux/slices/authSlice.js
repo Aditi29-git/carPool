@@ -65,6 +65,7 @@ export const login = createAsyncThunk(
           'Content-Type': 'application/json',
         }
       });
+      console.log('Login response:', response.data);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response.data);
@@ -159,6 +160,7 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(login.fulfilled, (state, action) => {
+        console.log('Setting user state:', action.payload);
         state.isLoading = false;
         state.isAuthenticated = true;
         state.token = action.payload.token;

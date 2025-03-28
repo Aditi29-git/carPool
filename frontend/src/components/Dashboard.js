@@ -7,7 +7,15 @@ import MyBookings from './rides/MyBookings';
 
 const Dashboard = () => {
   const { user } = useSelector((state) => state.auth);
-  const [activeTab, setActiveTab] = useState(user?.role === 'rider' ? 'manage' : 'search');
+  console.log('Current user in Dashboard:', user);
+  console.log('User role:', user?.role);
+  
+  // Force role to lowercase for comparison
+  const userRole = user?.role?.toLowerCase();
+  console.log('Normalized user role:', userRole);
+  console.log('Is rider?:', userRole === 'rider');
+  
+  const [activeTab, setActiveTab] = useState(userRole === 'rider' ? 'manage' : 'search');
 
   const renderRiderDashboard = () => (
     <div className="space-y-6">
@@ -75,7 +83,7 @@ const Dashboard = () => {
 
   return (
     <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-      {user?.role === 'rider' ? renderRiderDashboard() : renderUserDashboard()}
+      {userRole === 'rider' ? renderRiderDashboard() : renderUserDashboard()}
     </div>
   );
 };

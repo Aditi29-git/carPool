@@ -147,7 +147,17 @@ exports.login = async (req, res) => {
             maxAge: 7*24 * 60 * 60 * 1000,
         });
         
-        res.status(200).json({ message: "Login successful", token, role: user.role });
+        res.status(200).json({
+            message: "Login successful",
+            token,
+            user: {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                phoneNumber: user.phoneNumber
+            }
+        });
     } catch (error) {
         console.error("Error logging in:", error);
         return res.status(500).json({ message: "Error logging in", error: error.message });
@@ -241,8 +251,14 @@ exports.checkAuth = async (req, res) => {
 
         return res.status(200).json({
             message: "Authentication valid",
-            role: user.role,
-            token
+            token,
+            user: {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                phoneNumber: user.phoneNumber
+            }
         });
     } catch (error) {
         console.error("Error checking auth:", error);
